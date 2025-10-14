@@ -1,12 +1,16 @@
 import sys
-
+import os
+import App.logic as logic
+from tabulate import tabulate
+default_limit = 1000
+sys.setrecursionlimit(default_limit*10)
 
 def new_logic():
     """
         Se crea una instancia del controlador
     """
     #TODO: Llamar la función de la lógica donde se crean las estructuras de datos
-    pass
+    return logic.new_logic()
 
 def print_menu():
     print("Bienvenido")
@@ -23,16 +27,20 @@ def load_data(control):
     """
     Carga los datos
     """
-    #TODO: Realizar la carga de datos
-    pass
+    # Cargar viajes
+    taxis_file = os.path.join("Challenge-1", "taxis-large.csv")
+    logic.load_data(control, taxis_file)
+
+    # Cargar barrios
+    barrios_file = os.path.join("Challenge-1", "nyc-neighborhoods.csv")
+    logic.load_neighborhoods(control, barrios_file)
 
 
 def print_data(control, id):
     """
         Función que imprime un dato dado su ID
     """
-    #TODO: Realizar la función para imprimir un elemento
-    pass
+    print("El elemento es: ", logic.get_data(control, id))
 
 def print_req_1(control):
     """
