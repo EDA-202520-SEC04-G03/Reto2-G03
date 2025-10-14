@@ -6,6 +6,7 @@ import math
 from DataStructures.List import array_list as lt
 from DataStructures.Stack import stack as st
 from DataStructures.Queue import queue as q
+from DataStructures.Map import map_linear_probing as mp
 
 data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Data")
 
@@ -193,6 +194,8 @@ def get_data(catalog, idx):
     """
     return lt.get_element(catalog["trips"], idx)
 
+
+
 def req_1(catalog):
     """
     Retorna el resultado del requerimiento 1
@@ -209,21 +212,153 @@ def req_2(catalog):
     pass
 
 
-def req_3(catalog):
+def req_3(catalog, distancia_min, distancia_max, n_muestra):
     """
-    Retorna el resultado del requerimiento 3
+    Filtra trayectos con trip_distance en [distancia_min, distancia_max],
+    ordena por distancia ↓ y, si empata, por total_amount ↓,
+    y retorna {tiempo_ms, total, primeros, ultimos}.
     """
-    # TODO: Modificar el requerimiento 3
-    pass
+    inicio_ms = get_time()
+
+    # Filtrar
+    filtrados = lt.new_list()
+    for t in catalog["trips"]["elements"]:
+        d = t["trip_distance"]
+        if distancia_min <= d <= distancia_max:
+            lt.add_last(filtrados, t)
+
+    # Comparator: distancia ↓, costo ↓
+    def cmp_desc_dist_cost(a, b):
+        if a["trip_distance"] != b["trip_distance"]:
+            return a["trip_distance"] > b["trip_distance"]
+        return a["total_amount"] > b["total_amount"]
+
+    filtrados = lt.merge_sort(filtrados, cmp_desc_dist_cost)
+    total = lt.size(filtrados)
+
+    # Armar salida
+    primeros, ultimos = [], []
+
+    def fila(t):
+        return {
+            "pickup_datetime": t["pickup_datetime"],
+            "pickup_coord": f'[{round(t["pickup_latitude"],5)}, {round(t["pickup_longitude"],5)}]',
+            "dropoff_datetime": t["dropoff_datetime"],
+            "dropoff_coord": f'[{round(t["dropoff_latitude"],5)}, {round(t["dropoff_longitude"],5)}]',
+            "trip_distance(mi)": round(t["trip_distance"], 3),
+            "total_amount": round(t["total_amount"], 2)
+        }
+
+    if total <= 2 * n_muestra:
+        i = 0
+        while i < total:
+            primeros.append(fila(lt.get_element(filtrados, i)))
+            i += 1
+    else:
+        i = 0
+        while i < n_muestra:
+            primeros.append(fila(lt.get_element(filtrados, i)))
+            i += 1
+        i = total - n_muestra
+        while i < total:
+            ultimos.append(fila(lt.get_element(filtrados, i)))
+            i += 1
+
+    fin_ms = get_time()
+    return {
+        "tiempo_ms": round(delta_time(inicio_ms, fin_ms), 3),
+        "total": total,
+        "primeros": primeros,
+        "ultimos": ultimos
+    }
 
 
-def req_4(catalog):
-    """
-    Retorna el resultado del requerimiento 4
-    """
-    # TODO: Modificar el requerimiento 4
-    pass
 
+def req_4(catalog, fecha_yyyy_mm_dd, momento_interes, hora_referencia_hms, n_muestra):
+    """
+    Usa Hash cuya llave es la fecha de terminación 'YYYY-MM-DD'.
+    Filtra:
+      - ANTES   -> dropoff_time < hora_referencia_hms
+      - DESPUES -> dropoff_time > hora_referencia_hms
+    Orden final: dropoff_datetime ↓ (más reciente primero).
+    Retorna {tiempo_ms, total, primeros, ultimos}.
+    """
+    inicio_ms = get_time()
+
+    # Índice hash por fecha de terminación
+    indice = mp.new_map(num_elements=max(1, lt.size(catalog["trips"])), load_factor=0.5)
+    for t in catalog["trips"]["elements"]:
+        llave = t["dropoff_datetime"][:10]  # YYYY-MM-DD
+        balde = mp.get(indice, llave)
+        if balde is None:
+            balde = lt.new_list()
+            mp.put(indice, llave, balde)
+        lt.add_last(balde, t)
+
+    del_dia = mp.get(indice, fecha_yyyy_mm_dd)
+
+    # Filtrar por hora respecto a referencia
+    candidatos = lt.new_list()
+    if del_dia is not None and lt.size(del_dia) > 0:
+        i = 0
+        tam = lt.size(del_dia)
+        if momento_interes == "ANTES":
+            while i < tam:
+                t = lt.get_element(del_dia, i)
+                hhmmss = t["dropoff_datetime"][11:19]
+                if hhmmss < hora_referencia_hms:
+                    lt.add_last(candidatos, t)
+                i += 1
+        else:  # DESPUES
+            while i < tam:
+                t = lt.get_element(del_dia, i)
+                hhmmss = t["dropoff_datetime"][11:19]
+                if hhmmss > hora_referencia_hms:
+                    lt.add_last(candidatos, t)
+                i += 1
+
+    # Ordenar por dropoff_datetime ↓
+    def cmp_drop_desc(a, b):
+        return a["dropoff_datetime"] > b["dropoff_datetime"]
+
+    candidatos = lt.merge_sort(candidatos, cmp_drop_desc)
+    total = lt.size(candidatos)
+
+    # Armar salida
+    primeros, ultimos = [], []
+
+    def fila(t):
+        return {
+            "pickup_datetime": t["pickup_datetime"],
+            "pickup_coord": f'[{round(t["pickup_latitude"],5)}, {round(t["pickup_longitude"],5)}]',
+            "dropoff_datetime": t["dropoff_datetime"],
+            "dropoff_coord": f'[{round(t["dropoff_latitude"],5)}, {round(t["dropoff_longitude"],5)}]',
+            "trip_distance(mi)": round(t["trip_distance"], 3),
+            "total_amount": round(t["total_amount"], 2)
+        }
+
+    if total <= 2 * n_muestra:
+        i = 0
+        while i < total:
+            primeros.append(fila(lt.get_element(candidatos, i)))
+            i += 1
+    else:
+        i = 0
+        while i < n_muestra:
+            primeros.append(fila(lt.get_element(candidatos, i)))
+            i += 1
+        i = total - n_muestra
+        while i < total:
+            ultimos.append(fila(lt.get_element(candidatos, i)))
+            i += 1
+
+    fin_ms = get_time()
+    return {
+        "tiempo_ms": round(delta_time(inicio_ms, fin_ms), 3),
+        "total": total,
+        "primeros": primeros,
+        "ultimos": ultimos
+    }
 
 def req_5(catalog):
     """

@@ -28,12 +28,13 @@ def load_data(control):
     Carga los datos
     """
     # Cargar viajes
-    taxis_file = os.path.join("Challenge-1", "taxis-large.csv")
+    taxis_file = "taxis-large.csv"
     logic.load_data(control, taxis_file)
 
     # Cargar barrios
-    barrios_file = os.path.join("Challenge-1", "nyc-neighborhoods.csv")
+    barrios_file = "nyc-neighborhoods.csv"
     logic.load_neighborhoods(control, barrios_file)
+
 
 
 def print_data(control, id):
@@ -63,7 +64,28 @@ def print_req_3(control):
         Función que imprime la solución del Requerimiento 3 en consola
     """
     # TODO: Imprimir el resultado del requerimiento 3
-    pass
+    distancia_min = float(input("Valor inicial de distancia (millas): ").strip())
+    distancia_max = float(input("Valor final de distancia (millas): ").strip())
+    n_muestra = int(input("Tamaño de la muestra N (para primeros y últimos): ").strip())
+
+    respuesta = logic.req_3(control, distancia_min, distancia_max, n_muestra)
+
+    print(f"\nTiempo de ejecución: {respuesta['tiempo_ms']} ms")
+    print(f"Número total de trayectos que cumplen el filtro: {respuesta['total']}")
+
+    # Primeros N
+    print("\n=== Primeros N trayectos ===")
+    if len(respuesta["primeros"]) > 0:
+        print(tabulate(respuesta["primeros"], headers="keys", tablefmt="psql"))
+    else:
+        print("(vacío)")
+
+    # Últimos N (puede venir vacío si total < 2N)
+    print("\n=== Últimos N trayectos ===")
+    if len(respuesta["ultimos"]) > 0:
+        print(tabulate(respuesta["ultimos"], headers="keys", tablefmt="psql"))
+    else:
+        print("(vacío)")
 
 
 def print_req_4(control):
@@ -71,7 +93,29 @@ def print_req_4(control):
         Función que imprime la solución del Requerimiento 4 en consola
     """
     # TODO: Imprimir el resultado del requerimiento 4
-    pass
+    fecha_terminacion = input('Fecha de terminación (formato "YYYY-MM-DD"): ').strip()
+    momento_interes = input('Momento de interés ("ANTES" o "DESPUES"): ').strip().upper()
+    hora_referencia = input('Hora de referencia (formato "HH:MM:SS"): ').strip()
+    n_muestra = int(input("Tamaño de la muestra N (para primeros y últimos): ").strip())
+
+    respuesta = logic.req_4(control, fecha_terminacion, momento_interes, hora_referencia, n_muestra)
+
+    print(f"\nTiempo de ejecución: {respuesta['tiempo_ms']} ms")
+    print(f"Número total de trayectos que cumplen fecha y hora: {respuesta['total']}")
+
+    # Primeros N
+    print("\n=== Primeros N trayectos ===")
+    if len(respuesta["primeros"]) > 0:
+        print(tabulate(respuesta["primeros"], headers="keys", tablefmt="psql"))
+    else:
+        print("(vacío)")
+
+    # Últimos N (puede venir vacío si total < 2N)
+    print("\n=== Últimos N trayectos ===")
+    if len(respuesta["ultimos"]) > 0:
+        print(tabulate(respuesta["ultimos"], headers="keys", tablefmt="psql"))
+    else:
+        print("(vacío)")
 
 
 def print_req_5(control):
@@ -120,7 +164,7 @@ def main():
         elif int(inputs) == 5:
             print_req_5(control)
 
-        elif int(inputs) == 5:
+        elif int(inputs) == 6:
             print_req_6(control)
 
         elif int(inputs) == 7:
