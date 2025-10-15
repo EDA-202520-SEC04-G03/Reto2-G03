@@ -28,11 +28,11 @@ def load_data(control):
     Carga los datos
     """
     # Cargar viajes
-    taxis_file = os.path.join("Challenge-1", "taxis-large.csv")
+    taxis_file = os.path.join("Challenge-2", "taxis-large.csv")
     logic.load_data(control, taxis_file)
 
     # Cargar barrios
-    barrios_file = os.path.join("Challenge-1", "nyc-neighborhoods.csv")
+    barrios_file = os.path.join("Challenge-2", "nyc-neighborhoods.csv")
     logic.load_neighborhoods(control, barrios_file)
 
 
@@ -104,8 +104,54 @@ def print_req_3(control):
     """
         Función que imprime la solución del Requerimiento 3 en consola
     """
-    # TODO: Imprimir el resultado del requerimiento 3
-    pass
+    print("\n=== REQ 3: Trayectos en rango de distancia recorrida ===")
+    distancia_inicial = float(input("Distancia mínima (millas): ").strip())
+    distancia_final = float(input("Distancia máxima (millas): ").strip())
+    # Se le asigna un valor a N por defecto en caso de que el usuario no ingrese nada por si acaso nomas
+    N = int(input("Tamaño de muestra N (enter para 5): ").strip())
+    if not N:
+        N = 5
+
+    result = logic.req_3(control, distancia_inicial, distancia_final, N)
+
+    print(f"\n Tiempo de ejecución: {result['tiempo_ms']} ms")
+    print(f"Total de trayectos filtrados: {result['total_filtrados']}")
+
+    # Convertir a tabla estilo tabulate
+    def rows_to_table(rows):
+        table = []
+        for r in rows:
+            table.append([
+                r["pickup_datetime"],
+                f"[{r['pickup_coords'][0]}, {r['pickup_coords'][1]}]",
+                r["dropoff_datetime"],
+                f"[{r['dropoff_coords'][0]}, {r['dropoff_coords'][1]}]",
+                r["trip_distance"],
+                r["total_amount"],
+            ])
+        return table
+
+    headers = ["Pickup (fecha/hora)", "Pickup [Lat, Lon]", "Dropoff (fecha/hora)", "Dropoff [Lat, Lon]", "Dist (mi)", "Costo (USD)"]
+
+    first_tbl = rows_to_table(result["primeros"])
+    last_tbl  = rows_to_table(result["ultimos"])
+
+    if first_tbl:
+        print("\n-- N primeros (mayor distancia) --")
+        print(tabulate(first_tbl, headers=headers, tablefmt="grid", stralign="center"))
+    else:
+        print("\n(No hay trayectos para mostrar en el inicio del ranking)")
+
+    # Solo se imprime la tabla de últimos si no es lo mismo que los primeros (porque así definimos la lógica
+    # en caso de que haya menos de 2N elementos)
+    if last_tbl and last_tbl != first_tbl:
+        print("\n-- N últimos (menor distancia dentro del rango) --")
+        print(tabulate(last_tbl, headers=headers, tablefmt="grid", stralign="center"))
+    else:
+        if result["total_filtrados"] > 0 and len(first_tbl) == result["total_filtrados"]:
+            print("\n(Se mostraron todos los trayectos en la primera tabla por ser menos de 2N)")
+    
+    print("")
 
 
 def print_req_4(control):
