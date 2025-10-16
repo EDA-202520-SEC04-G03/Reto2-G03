@@ -663,7 +663,19 @@ def req_6(catalog):
     Retorna el resultado del requerimiento 6
     """
     # TODO: Modificar el requerimiento 6
-    pass
+    
+    # Se define la funcion haversine como pide en el documento
+    def haversine(lat1, lon1, lat2, lon2):
+        R = 6371  # Radio de la Tierra en km
+        phi1 = math.radians(lat1)
+        phi2 = math.radians(lat2)
+        delta_phi = math.radians(lat2 - lat1)
+        delta_lambda = math.radians(lon2 - lon1)
+
+        a = math.sin(delta_phi / 2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2)**2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+        return R * c
 
 
 # Funciones para medir tiempos de ejecucion
