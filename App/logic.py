@@ -658,7 +658,7 @@ def req_5(catalog, term_dt_hour_str, sample_n=5):
         "last_n": last_py
     }
 
-def req_6(catalog):
+def req_6(catalog, barrio_buscar, hora_inicio_str, hora_fin_str, n_muestra):
     """
     Retorna el resultado del requerimiento 6
     """
@@ -676,6 +676,163 @@ def req_6(catalog):
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
         return R * c
+
+    inicio_ms = get_time()
+
+    # Normalizar barrio
+    barrio_key = (barrio_buscar or "").strip().lower()
+
+    # Parsear horas
+    def parse_hour(s, default):
+        if s is None:
+            return default
+        ss = str(s).strip()
+        if ss.isdigit():
+            v = int(ss)
+            if 0 <= v <= 23:
+                return v
+        return default
+
+    h_start = parse_hour(hora_inicio_str, 0)
+    h_end = parse_hour(hora_fin_str, 23)
+
+    # Parsear N
+    def parse_n(s, default):
+        if s.isdigit():
+            if s > 0:
+                return s
+            else:
+                return default
+        ss = str(s).strip()
+        if ss.isdigit():
+            v = int(ss)
+            if v > 0:
+                return v
+            else:
+                return default
+        return default
+
+    N = parse_n(n_muestra, 5)
+
+    # Construir índice hash por barrio con el indice de los barrios como pide el documento
+    barrios_list = catalog["barrios"]
+    size_barrios = lt.size(barrios_list)
+    idx_barrios = mp.new_map(max(1, size_barrios), 0.5)
+    for i in size_barrios:
+        b = lt.get_element(barrios_list, i)
+        nb_key = b["neighborhood"].strip().lower()
+        if mp.get(idx_barrios, nb_key) is None:
+            mp.put(idx_barrios, nb_key, lt.new_list())
+
+    # Asignar cada viaje al barrio más cercano
+    for i in lt.size(catalog["trips"]):
+        t = get_data(catalog, i)
+        plat = t.get("pickup_latitude")
+        plon = t.get("pickup_longitude")
+        if plat is not None and plon is not None:
+            mejor_nb = None
+            mejor_dist = None
+            for b in barrios_list:
+                lat_b = b.get("latitude")
+                lon_b = b.get("longitude")
+                if lat_b is not None or lon_b is not None:
+                    d = haversine(plat, plon, lat_b, lon_b)
+                    if mejor_dist is None or d < mejor_dist:
+                        mejor_dist = d
+                        mejor_nb = b["neighborhood"].strip().lower()
+            if mejor_nb is not None:
+                bucket = mp.get(idx_barrios, mejor_nb)
+                if bucket is None:
+                    bucket = lt.new_list()
+                    mp.put(idx_barrios, mejor_nb, bucket)
+                lt.add_last(bucket, t)
+
+    # Obtener bucket del barrio buscado
+    bucket_barrio = mp.get(idx_barrios, barrio_key)
+    if bucket_barrio is None or lt.size(bucket_barrio) == 0:
+        tiempo_ms = round(delta_time(inicio_ms, get_time()), 3)
+        return {"tiempo_ms": tiempo_ms, 
+        "total": 0, 
+        "primeros": lt.new_list(), 
+        "ultimos": lt.new_list()
+        }
+
+    # Filtrar por hora
+    candidatos = lt.new_list()
+    tam = lt.size(bucket_barrio)
+    crosses_midnight = (h_start > h_end)
+    i = 0
+    while i < tam:
+        trip = lt.get_element(bucket_barrio, i)
+        ph = trip.get("pickup_hour")
+        if ph is None:
+            pd = trip.get("pickup_datetime")
+            if isinstance(pd, str) and len(pd) >= 13:
+                hh = pd[11:13]
+                if hh.isdigit():
+                    ph = int(hh)
+        if ph is not None:
+            if not crosses_midnight:
+                if h_start <= ph and ph <= h_end:
+                    lt.add_last(candidatos, trip)
+            else:
+                if ph >= h_start or ph <= h_end:
+                    lt.add_last(candidatos, trip)
+        i += 1
+
+    total = lt.size(candidatos)
+
+    # Ordenar por pickup_ts ascendente (más antiguo primero)
+    def sort_criteria_req6(a, b):
+        return a["pickup_ts"] < b["pickup_ts"]
+
+    if total > 1:
+        candidatos = lt.merge_sort(candidatos, sort_criteria_req6)
+
+    # Preparar salida
+    primeros = lt.new_list()
+    ultimos = lt.new_list()
+
+    def fila(t):
+        return {
+            "pickup_datetime": t["pickup_datetime"],
+            "pickup_coord": [round(t["pickup_latitude"], 6), round(t["pickup_longitude"], 6)],
+            "dropoff_datetime": t["dropoff_datetime"],
+            "dropoff_coord": [round(t["dropoff_latitude"], 6), round(t["dropoff_longitude"], 6)],
+            "trip_distance": round(t["trip_distance"], 3),
+            "total_amount": round(t["total_amount"], 2)
+        }
+
+    if total == 0:
+        tiempo_ms = round(delta_time(inicio_ms, get_time()), 3)
+        return {"tiempo_ms": tiempo_ms,
+        "total": 0, 
+        "primeros": primeros, 
+        "ultimos": ultimos
+        }
+
+    if total <= 2 * N:
+        j = 0
+        while j < total:
+            lt.add_last(primeros, fila(lt.get_element(candidatos, j)))
+            j += 1
+        ultimos = primeros
+    else:
+        j = 0
+        while j < N:
+            lt.add_last(primeros, fila(lt.get_element(candidatos, j)))
+            j += 1
+        j = total - N
+        while j < total:
+            lt.add_last(ultimos, fila(lt.get_element(candidatos, j)))
+            j += 1
+
+    tiempo_ms = round(delta_time(inicio_ms, get_time()), 3)
+    return {"tiempo_ms": tiempo_ms, 
+    "total": total, 
+    "primeros": primeros, 
+    "ultimos": ultimos
+    }
 
 
 # Funciones para medir tiempos de ejecucion
