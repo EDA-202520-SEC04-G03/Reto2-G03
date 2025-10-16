@@ -212,8 +212,52 @@ def print_req_5(control):
     """
         Función que imprime la solución del Requerimiento 5 en consola
     """
-    # TODO: Imprimir el resultado del requerimiento 5
-    pass
+    print("\n=== REQ 5: Trayectos en una fecha y hora de terminación específicas ===")
+    fecha_hora = input("Ingrese la fecha y hora de terminación (AAAA-MM-DD HH): ").strip()
+    N = input("Tamaño de muestra N (enter para 5): ").strip()
+    if N:
+        N = int(N)
+    else:
+        N = 5
+
+    result = logic.req_5(control, fecha_hora, N)
+
+    print(f"\nTiempo de ejecución: {result['tiempo_ms']} ms")
+    print(f"Total de trayectos filtrados: {result['total_filtrados']}")
+
+    # Convertir a tabla estilo tabulate
+    def filas_a_tabla(filas):
+        tabla = []
+        for r in filas:
+            tabla.append([
+                r["pickup_datetime"],
+                f"[{r['pickup_coords'][0]}, {r['pickup_coords'][1]}]",
+                r["dropoff_datetime"],
+                f"[{r['dropoff_coords'][0]}, {r['dropoff_coords'][1]}]",
+                r["trip_distance"],
+                r["total_amount"],
+            ])
+        return tabla
+
+    encabezados = ["Pickup (fecha/hora)", "Pickup [Lat, Lon]", "Dropoff (fecha/hora)", "Dropoff [Lat, Lon]", "Dist (mi)", "Costo (USD)"]
+
+    primeros_tbl = filas_a_tabla(result["primeros"]["elements"])
+    ultimos_tbl  = filas_a_tabla(result["ultimos"]["elements"])
+
+    if primeros_tbl:
+        print("\n-- N primeros (más recientes) --")
+        print(tabulate(primeros_tbl, headers=encabezados, tablefmt="grid", stralign="center"))
+    else:
+        print("\n(No hay trayectos para mostrar en el inicio del rango)")
+
+    if ultimos_tbl and ultimos_tbl != primeros_tbl:
+        print("\n-- N últimos (más antiguos) --")
+        print(tabulate(ultimos_tbl, headers=encabezados, tablefmt="grid", stralign="center"))
+    else:
+        if result["total_filtrados"] > 0 and len(primeros_tbl) == result["total_filtrados"]:
+            print("\n(Se mostraron todos los trayectos en la primera tabla por ser menos de 2N)")
+
+    print("")
 
 
 def print_req_6(control):

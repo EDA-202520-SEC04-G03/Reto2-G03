@@ -22,12 +22,13 @@ def new_logic():
     """
     Crea el catalogo para almacenar las estructuras de datos
     """
-    catalogo = {"trips" : None , 
-                "barrios" : None }
-    
+    catalogo = {
+        "trips": None,
+        "barrios": None,
+        "idx_req5": None
+    }
     catalogo["trips"] = lt.new_list()
     catalogo["barrios"] = lt.new_list()
-    
     return catalogo
 
 
@@ -193,6 +194,29 @@ def load_neighborhoods(catalog, filename):
         print("\nNo se cargaron barrios. Revisa delimitador ';' y columnas: borough;neighborhood;latitude;longitude")
     return catalog
 
+
+def clave_hora_terminacion(trip):
+    # Llave: "%Y-%m-%d %H" tomada de dropoff_datetime
+    # dropoff_datetime viene como "YYYY-MM-DD HH:MM:SS"
+    dt = trip["dropoff_datetime"]
+    # Primeros 13 caracteres: "YYYY-MM-DD HH"
+    return dt[:13]
+
+def construir_indice_por_hora_terminacion(catalog):
+    # Construye índice hash: key -> lista de viajes con esa fecha+hora de terminación
+    if "idx_req5" in catalog and catalog["idx_req5"] is not None:
+        return
+    index = mp.new_map(15000, 0.5)
+    trips = catalog["trips"]["elements"]
+    for t in trips:
+        k = clave_hora_terminacion(t)
+        bucket = mp.get(index, k)
+        if bucket is None:
+            bucket = lt.new_list()
+            mp.put(index, k, bucket)
+        lt.add_last(bucket, t)
+    catalog["idx_req5"] = index
+
 # Funciones de consulta sobre el catálogo
 
 def get_data(catalog, idx):
@@ -204,28 +228,31 @@ def get_data(catalog, idx):
 
 
 def req_1(catalog, start_dt_str, end_dt_str, sample_n):
-   
+    """
+    Retorna el resultado del requerimiento 1 (filtrado por franja de recogida), con salida estilo REQ 3 y compatibilidad hacia atrás.
+    """
     start_clock = get_time()
-
-    # Parseo de fechas/horas de entrada
+    
     start_tuple = time.strptime(start_dt_str, "%Y-%m-%d %H:%M:%S")
     end_tuple   = time.strptime(end_dt_str,   "%Y-%m-%d %H:%M:%S")
     start_ts = time.mktime(start_tuple)
     end_ts   = time.mktime(end_tuple)
 
-    # Acceso al array 
+    
     trips_pylist = catalog["trips"]["elements"]
+    filtrados = lt.new_list()
+    for t in trips_pylist:
+        if start_ts <= t["pickup_ts"] and t["pickup_ts"] <= end_ts:
+            lt.add_last(filtrados, t)
 
-    # Filtrar por franja de recogida (pickup_ts en [start_ts, end_ts])
-    filtered = [t for t in trips_pylist if start_ts <= t["pickup_ts"] <= end_ts]
+    
+    def cmp_pickup_ts_asc(t1, t2):
+        return t1["pickup_ts"] < t2["pickup_ts"]
 
-    # Acá Ordenamos del más antiguo al más reciente por pickup_ts
-    def sort_by_pickup_ts(trip):
-        return trip["pickup_ts"]
-    filtered_sorted = sorted(filtered, key=sort_by_pickup_ts)
-    total = len(filtered_sorted)
+    size_filtrados = lt.size(filtrados)
+    if size_filtrados > 1:
+        filtrados = lt.merge_sort(filtrados, cmp_pickup_ts_asc)
 
-    # Tamaño de muestra
     if isinstance(sample_n, int):
         N = sample_n
     else:
@@ -234,35 +261,66 @@ def req_1(catalog, start_dt_str, end_dt_str, sample_n):
     if N <= 0:
         N = 5
 
-    # Construcción de filas de salida con los campos requeridos
-    def build_row(trip):
-        return {
-            "pickup_datetime": trip["pickup_datetime"],
-            "pickup_coords": [round(trip["pickup_latitude"], 6),
-                              round(trip["pickup_longitude"], 6)],  # [Lat, Lon]
-            "dropoff_datetime": trip["dropoff_datetime"],
-            "dropoff_coords": [round(trip["dropoff_latitude"], 6),
-                               round(trip["dropoff_longitude"], 6)],  # [Lat, Lon]
-            "trip_distance": round(trip["trip_distance"], 3),
-            "total_amount": round(trip["total_amount"], 2),
-        }
+    
+    primeros = lt.new_list()
+    ultimos  = lt.new_list()
 
-    # Regla: si hay menos de 2N, se muestran todos los trayectos (sin duplicar)
-    if total <= 2 * N:
-        first_n_rows = [build_row(t) for t in filtered_sorted]
-        last_n_rows = []
+    if size_filtrados <= 2 * N:
+        # Mostrar todos en "primeros" y reutilizar en "ultimos"
+        for t in filtrados["elements"]:
+            lt.add_last(primeros, {
+                "pickup_datetime": t["pickup_datetime"],
+                "pickup_coords": [t["pickup_latitude"], t["pickup_longitude"]],
+                "dropoff_datetime": t["dropoff_datetime"],
+                "dropoff_coords": [t["dropoff_latitude"], t["dropoff_longitude"]],
+                "trip_distance": round(t["trip_distance"], 3),
+                "total_amount": round(t["total_amount"], 2)
+            })
+        ultimos = primeros
     else:
-        first_n_rows = [build_row(t) for t in filtered_sorted[:N]]
-        last_n_rows = [build_row(t) for t in filtered_sorted[-N:]]
+        # N primeros
+        for i in range(N):
+            t = lt.get_element(filtrados, i)
+            lt.add_last(primeros, {
+                "pickup_datetime": t["pickup_datetime"],
+                "pickup_coords": [t["pickup_latitude"], t["pickup_longitude"]],
+                "dropoff_datetime": t["dropoff_datetime"],
+                "dropoff_coords": [t["dropoff_latitude"], t["dropoff_longitude"]],
+                "trip_distance": round(t["trip_distance"], 3),
+                "total_amount": round(t["total_amount"], 2)
+            })
+        # N últimos
+        for i in range(size_filtrados - N, size_filtrados):
+            t = lt.get_element(filtrados, i)
+            lt.add_last(ultimos, {
+                "pickup_datetime": t["pickup_datetime"],
+                "pickup_coords": [t["pickup_latitude"], t["pickup_longitude"]],
+                "dropoff_datetime": t["dropoff_datetime"],
+                "dropoff_coords": [t["dropoff_latitude"], t["dropoff_longitude"]],
+                "trip_distance": round(t["trip_distance"], 3),
+                "total_amount": round(t["total_amount"], 2)
+            })
 
     end_clock = get_time()
-    elapsed_ms = round(delta_time(start_clock, end_clock), 3)
+    tiempo_ms = round(delta_time(start_clock, end_clock), 3)
+
+    
+    first_py = []
+    for e in primeros["elements"]:
+        first_py.append(e)
+    last_py = []
+    for e in ultimos["elements"]:
+        last_py.append(e)
 
     return {
-        "elapsed_ms": elapsed_ms,
-        "total_trips": total,
-        "first_n": first_n_rows,
-        "last_n": last_n_rows
+        "tiempo_ms": tiempo_ms,
+        "total_filtrados": size_filtrados,
+        "primeros": primeros,
+        "ultimos": ultimos,
+        "elapsed_ms": tiempo_ms,
+        "total_trips": size_filtrados,
+        "first_n": first_py,
+        "last_n": last_py
     }
 
 
@@ -499,12 +557,106 @@ def req_4(catalog, fecha_yyyy_mm_dd, momento_interes, hora_referencia_hms, n_mue
         "ultimos": ultimos
     }
 
-def req_5(catalog):
-    """
-    Retorna el resultado del requerimiento 5
-    """
-    # TODO: Modificar el requerimiento 5
-    pass
+
+def req_5(catalog, term_dt_hour_str, sample_n=5):
+    
+    start_clock = get_time()
+
+    #
+    construir_indice_por_hora_terminacion(catalog)
+    idx = catalog["idx_req5"]
+
+    
+    bucket = mp.get(idx, term_dt_hour_str)
+    if bucket is None:
+        tiempo_ms = round(delta_time(start_clock, get_time()), 3)
+        
+        vacia = lt.new_list()
+        return {
+            "tiempo_ms": tiempo_ms,
+            "total_filtrados": 0,
+            "primeros": vacia,
+            "ultimos": vacia,
+            "elapsed_ms": tiempo_ms,
+            "total_trips": 0,
+            "first_n": [],
+            "last_n": []
+        }
+
+    
+    def cmp_dropoff_ts_desc(t1, t2):
+        return t1["dropoff_ts"] > t2["dropoff_ts"]
+
+    size_bucket = lt.size(bucket)
+    if size_bucket > 1:
+        bucket = lt.merge_sort(bucket, cmp_dropoff_ts_desc)
+
+    
+    if isinstance(sample_n, int):
+        n_val = sample_n
+    else:
+        s = str(sample_n).strip()
+        n_val = int(s) if s.isdigit() else 5
+    if n_val <= 0:
+        n_val = 5
+
+    
+    primeros = lt.new_list()
+    ultimos  = lt.new_list()
+
+    if size_bucket <= 2 * n_val:
+        for t in bucket["elements"]:
+            lt.add_last(primeros, {
+                "pickup_datetime": t["pickup_datetime"],
+                "pickup_coords": [t["pickup_latitude"], t["pickup_longitude"]],
+                "dropoff_datetime": t["dropoff_datetime"],
+                "dropoff_coords": [t["dropoff_latitude"], t["dropoff_longitude"]],
+                "trip_distance": round(t["trip_distance"], 3),
+                "total_amount": round(t["total_amount"], 2)
+            })
+        ultimos = primeros
+    else:
+        for i in range(n_val):
+            t = lt.get_element(bucket, i)
+            lt.add_last(primeros, {
+                "pickup_datetime": t["pickup_datetime"],
+                "pickup_coords": [t["pickup_latitude"], t["pickup_longitude"]],
+                "dropoff_datetime": t["dropoff_datetime"],
+                "dropoff_coords": [t["dropoff_latitude"], t["dropoff_longitude"]],
+                "trip_distance": round(t["trip_distance"], 3),
+                "total_amount": round(t["total_amount"], 2)
+            })
+        for i in range(size_bucket - n_val, size_bucket):
+            t = lt.get_element(bucket, i)
+            lt.add_last(ultimos, {
+                "pickup_datetime": t["pickup_datetime"],
+                "pickup_coords": [t["pickup_latitude"], t["pickup_longitude"]],
+                "dropoff_datetime": t["dropoff_datetime"],
+                "dropoff_coords": [t["dropoff_latitude"], t["dropoff_longitude"]],
+                "trip_distance": round(t["trip_distance"], 3),
+                "total_amount": round(t["total_amount"], 2)
+            })
+
+    tiempo_ms = round(delta_time(start_clock, get_time()), 3)
+
+    
+    first_py = []
+    for e in primeros["elements"]:
+        first_py.append(e)
+    last_py = []
+    for e in ultimos["elements"]:
+        last_py.append(e)
+
+    return {
+        "tiempo_ms": tiempo_ms,
+        "total_filtrados": size_bucket,
+        "primeros": primeros,
+        "ultimos": ultimos,
+        "elapsed_ms": tiempo_ms,
+        "total_trips": size_bucket,
+        "first_n": first_py,
+        "last_n": last_py
+    }
 
 def req_6(catalog):
     """
