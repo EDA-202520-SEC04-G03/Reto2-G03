@@ -47,8 +47,50 @@ def print_req_1(control):
     """
         Función que imprime la solución del Requerimiento 1 en consola
     """
-    # TODO: Imprimir el resultado del requerimiento 1
-    pass
+    print("\n=== REQ 1: Trayectos en franja de fecha y hora de recogida ===")
+    start_dt = input("Fecha/hora inicial (AAAA-MM-DD HH:MM:SS): ").strip()
+    end_dt   = input("Fecha/hora final   (AAAA-MM-DD HH:MM:SS): ").strip()
+    sample_n = input("Tamaño de muestra N (enter para 5): ").strip()
+    sample_n = int(sample_n) if sample_n else 5
+    
+    result = logic.req_1(control, start_dt, end_dt, sample_n)
+    
+    print(f"\nTiempo de ejecución: {result['elapsed_ms']} ms")
+    print(f"Total de trayectos en la franja: {result['total_trips']}")
+    
+    # hacemos las tablas linda
+    def rows_to_table(rows):
+        table = []
+        for r in rows:
+            table.append([
+                r["pickup_datetime"],
+                f"[{r['pickup_coords'][0]}, {r['pickup_coords'][1]}]",
+                r["dropoff_datetime"],
+                f"[{r['dropoff_coords'][0]}, {r['dropoff_coords'][1]}]",
+                r["trip_distance"],
+                r["total_amount"],
+            ])
+        return table
+    
+    headers = ["Pickup (fecha/hora)", "Pickup [Lat, Lon]", "Dropoff (fecha/hora)", "Dropoff [Lat, Lon]", "Dist (mi)", "Costo (USD)"]
+    
+    first_tbl = rows_to_table(result["first_n"])
+    last_tbl  = rows_to_table(result["last_n"])
+    
+    if first_tbl:
+        print("\n-- N primeros (más antiguos) --")
+        print(tabulate(first_tbl, headers=headers, tablefmt="grid", stralign="center"))
+    else:
+        print("\n(No hay trayectos para mostrar en el inicio del rango)")
+    
+    if last_tbl:
+        print("\n-- N últimos (más recientes) --")
+        print(tabulate(last_tbl, headers=headers, tablefmt="grid", stralign="center"))
+    else:
+        if result["total_trips"] > 0 and len(first_tbl) == result["total_trips"]:
+            print("\n(Se mostraron todos los trayectos en la primera tabla por ser menos de 2N)")
+    
+    print("")  
 
 
 def print_req_2(control):
@@ -164,6 +206,7 @@ def main():
         elif int(inputs) == 5:
             print_req_5(control)
 
+        elif int(inputs) == 6:
         elif int(inputs) == 6:
             print_req_6(control)
 

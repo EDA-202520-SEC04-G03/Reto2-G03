@@ -3,12 +3,20 @@ import os
 import csv 
 import tabulate 
 import math
+import re
 from DataStructures.List import array_list as lt
 from DataStructures.Stack import stack as st
 from DataStructures.Queue import queue as q
 from DataStructures.Map import map_linear_probing as mp
 
 data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Data")
+
+_FLOAT_RE = re.compile(r'^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$')
+def _parse_float_or_none(s: str):
+    if s is None:
+        return None
+    s2 = s.strip().replace(",", ".")
+    return float(s2) if _FLOAT_RE.match(s2) else None
 
 def new_logic():
     """
@@ -153,10 +161,9 @@ def load_neighborhoods(catalog, filename):
             lat_s = row.get("latitude")
             lon_s = row.get("longitude")
             
-            try:
-                lat = float(lat_s.replace(",", "."))
-                lon = float(lon_s.replace(",", "."))
-            except ValueError:
+            lat = _parse_float_or_none(lat_s)
+            lon = _parse_float_or_none(lon_s)
+            if lat is None or lon is None:
                 continue
 
             lt.add_last(catalog["barrios"], {
@@ -196,12 +203,67 @@ def get_data(catalog, idx):
 
 
 
-def req_1(catalog):
-    """
-    Retorna el resultado del requerimiento 1
-    """
-    # TODO: Modificar el requerimiento 1
-    pass
+def req_1(catalog, start_dt_str, end_dt_str, sample_n):
+   
+    start_clock = get_time()
+
+    # Parseo de fechas/horas de entrada
+    start_tuple = time.strptime(start_dt_str, "%Y-%m-%d %H:%M:%S")
+    end_tuple   = time.strptime(end_dt_str,   "%Y-%m-%d %H:%M:%S")
+    start_ts = time.mktime(start_tuple)
+    end_ts   = time.mktime(end_tuple)
+
+    # Acceso al array 
+    trips_pylist = catalog["trips"]["elements"]
+
+    # Filtrar por franja de recogida (pickup_ts en [start_ts, end_ts])
+    filtered = [t for t in trips_pylist if start_ts <= t["pickup_ts"] <= end_ts]
+
+    # Acá Ordenamos del más antiguo al más reciente por pickup_ts
+    def sort_by_pickup_ts(trip):
+        return trip["pickup_ts"]
+    filtered_sorted = sorted(filtered, key=sort_by_pickup_ts)
+    total = len(filtered_sorted)
+
+    # Tamaño de muestra
+    if isinstance(sample_n, int):
+        N = sample_n
+    else:
+        s = str(sample_n).strip()
+        N = int(s) if s.isdigit() else 5
+    if N <= 0:
+        N = 5
+
+    # Construcción de filas de salida con los campos requeridos
+    def build_row(trip):
+        return {
+            "pickup_datetime": trip["pickup_datetime"],
+            "pickup_coords": [round(trip["pickup_latitude"], 6),
+                              round(trip["pickup_longitude"], 6)],  # [Lat, Lon]
+            "dropoff_datetime": trip["dropoff_datetime"],
+            "dropoff_coords": [round(trip["dropoff_latitude"], 6),
+                               round(trip["dropoff_longitude"], 6)],  # [Lat, Lon]
+            "trip_distance": round(trip["trip_distance"], 3),
+            "total_amount": round(trip["total_amount"], 2),
+        }
+
+    # Regla: si hay menos de 2N, se muestran todos los trayectos (sin duplicar)
+    if total <= 2 * N:
+        first_n_rows = [build_row(t) for t in filtered_sorted]
+        last_n_rows = []
+    else:
+        first_n_rows = [build_row(t) for t in filtered_sorted[:N]]
+        last_n_rows = [build_row(t) for t in filtered_sorted[-N:]]
+
+    end_clock = get_time()
+    elapsed_ms = round(delta_time(start_clock, end_clock), 3)
+
+    return {
+        "elapsed_ms": elapsed_ms,
+        "total_trips": total,
+        "first_n": first_n_rows,
+        "last_n": last_n_rows
+    }
 
 
 def req_2(catalog):
