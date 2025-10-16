@@ -98,7 +98,55 @@ def print_req_2(control):
         Función que imprime la solución del Requerimiento 2 en consola
     """
     # TODO: Imprimir el resultado del requerimiento 2
-    pass
+    print("\n=== REQ 2: Trayectos en rango de latitud de recogida ===")
+    lat_min = float(input("Latitud mínima: ").strip())
+    lat_max = float(input("Latitud máxima: ").strip())
+
+    # Tamaño de muestra N (por defecto 5 si no se ingresa nada)
+    N = input("Tamaño de muestra N: ").strip()
+    if N:
+        N = int(N)
+    else:
+        N = 5
+
+    # Llamado a la función lógica
+    result = logic.req_2(control, lat_min, lat_max, N)
+
+    print(f"\n Tiempo de ejecución: {result['tiempo_ms']} ms")
+    print(f" Total de trayectos filtrados: {result['total_filtrados']}")
+
+    # Convertir a tabla estilo tabulate
+    def rows_to_table(rows):
+        table = []
+        for r in rows:
+            table.append([
+                r["pickup_datetime"],
+                f"[{r['pickup_coords'][0]}, {r['pickup_coords'][1]}]",
+                r["dropoff_datetime"],
+                f"[{r['dropoff_coords'][0]}, {r['dropoff_coords'][1]}]",
+                r["trip_distance"],
+                r["total_amount"],
+            ])
+        return table
+
+    headers = ["Pickup (fecha/hora)", "Pickup [Lat, Lon]", "Dropoff (fecha/hora)",
+               "Dropoff [Lat, Lon]", "Dist (mi)", "Costo (USD)"]
+
+    first_tbl = rows_to_table(result["primeros"])
+    last_tbl  = rows_to_table(result["ultimos"])
+
+    if first_tbl:
+        print("\n-- N primeros (mayor latitud) --")
+        print(tabulate(first_tbl, headers=headers, tablefmt="grid", stralign="center"))
+    else:
+        print("\n(No hay trayectos para mostrar en el inicio del ranking)")
+
+    if last_tbl and last_tbl != first_tbl:
+        print("\n-- N últimos (menor latitud dentro del rango) --")
+        print(tabulate(last_tbl, headers=headers, tablefmt="grid", stralign="center"))
+    else:
+        if result["total_filtrados"] > 0 and len(first_tbl) == result["total_filtrados"]:
+            print("\n(Se mostraron todos los trayectos en la primera tabla por ser menos de 2N)")
 
 
 def print_req_3(control):

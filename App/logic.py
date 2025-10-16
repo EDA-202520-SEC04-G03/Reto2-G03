@@ -266,12 +266,89 @@ def req_1(catalog, start_dt_str, end_dt_str, sample_n):
     }
 
 
-def req_2(catalog):
+def req_2(catalog, lat_min, lat_max, N):
     """
     Retorna el resultado del requerimiento 2
     """
     # TODO: Modificar el requerimiento 2
-    pass
+    start = get_time()
+
+    # Aca lo que hacemos es que filtramos los viajes por lo que dice el requerimiento
+    filtrados = lt.new_list()
+    size_trips = lt.size(total_trips)
+
+    for i in range(size_trips):
+        trip = get_data(catalog, i)
+        lat = trip["pickup_latitude"]
+        if lat_min <= lat and lat <= lat_max:
+            lt.add_last(filtrados, trip)
+
+    # Definimos el criterio de ordenamiento especifico para el requisito 2
+    def sort_criteria_req2(a, b):
+        if a["pickup_latitude"] > b["pickup_latitude"]:
+            return True
+        elif a["pickup_latitude"] < b["pickup_latitude"]:
+            return False
+        else:
+            return a["pickup_longitude"] > b["pickup_longitude"]
+
+    # Aca ordenamos usando merge sort
+    size_filtrados = lt.size(filtrados)
+    if size_filtrados > 1:
+        filtrados = merge_sort(filtrados, sort_criteria_req2)
+
+    # Creamos las listas para los primeros y ultimos
+    primeros = lt.new_list()
+    ultimos = lt.new_list()
+
+    if total_filtrados <= 2 * N:
+        # Se devuelve solamente una vez los elementos y se igualan
+        for i in range(size_filtrados):
+            t = lt.get_element(filtrados, i)
+            lt.add_last(t, primeros({
+                "pickup_datetime": t["pickup_datetime"],
+                "pickup_coords": [t["pickup_latitude"], t["pickup_longitude"]],
+                "dropoff_datetime": t["dropoff_datetime"],
+                "dropoff_coords": [t["dropoff_latitude"], t["dropoff_longitude"]],
+                "trip_distance": round(t["trip_distance"], 3),
+                "total_amount": round(t["total_amount"], 2)
+            }))
+        # Esto es para decir que los elementos sean iguales para no imprimirlos 2 veces porque los filtrados son menor que 2N
+        ultimos = primeros 
+    else:
+        # Aca agregamos los primeros elementos el rango de N
+        for i in range(N):
+            t = lt.get_element(filtrados, i)
+            lt.add_last(filtrados, ({
+                "pickup_datetime": t["pickup_datetime"],
+                "pickup_coords": [t["pickup_latitude"], t["pickup_longitude"]],
+                "dropoff_datetime": t["dropoff_datetime"],
+                "dropoff_coords": [t["dropoff_latitude"], t["dropoff_longitude"]],
+                "trip_distance": round(t["trip_distance"], 3),
+                "total_amount": round(t["total_amount"], 2)
+            }))
+
+        # Aca agregamos los ultimos elementos en el rango de N
+        for i in range(total_filtrados - N, total_filtrados):
+            t = lt.get_element(filtrados, i)
+            lt.add_last(filtrados, ({
+                "pickup_datetime": t["pickup_datetime"],
+                "pickup_coords": [t["pickup_latitude"], t["pickup_longitude"]],
+                "dropoff_datetime": t["dropoff_datetime"],
+                "dropoff_coords": [t["dropoff_latitude"], t["dropoff_longitude"]],
+                "trip_distance": round(t["trip_distance"], 3),
+                "total_amount": round(t["total_amount"], 2)
+            }))
+
+    end = get_time()
+    tiempo_ms = round(delta_time(start, end), 3)
+
+    return {
+        "tiempo_ms": tiempo_ms,
+        "total_filtrados": total_filtrados,
+        "primeros": primeros,
+        "ultimos": ultimos
+    }
 
 
 def req_3(catalog, distancia_min, distancia_max, n_muestra):
