@@ -299,7 +299,6 @@ def main():
             print_req_5(control)
 
         elif int(inputs) == 6:
-        elif int(inputs) == 6:
             print_req_6(control)
 
         elif int(inputs) == 7:
