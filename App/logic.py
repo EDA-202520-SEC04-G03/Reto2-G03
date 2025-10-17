@@ -340,26 +340,26 @@ def req_2(catalog, lat_min, lat_max, N):
         # Aca agregamos los primeros elementos el rango de N
         for i in range(N):
             t = lt.get_element(filtrados, i)
-            ultimos.append(({
+            primeros.append({
                 "pickup_datetime": t["pickup_datetime"],
                 "pickup_coords": [t["pickup_latitude"], t["pickup_longitude"]],
                 "dropoff_datetime": t["dropoff_datetime"],
                 "dropoff_coords": [t["dropoff_latitude"], t["dropoff_longitude"]],
                 "trip_distance": round(t["trip_distance"], 3),
                 "total_amount": round(t["total_amount"], 2)
-            }))
+            })
 
         # Aca agregamos los ultimos elementos en el rango de N
         for i in range(size_filtrados - N, size_filtrados):
             t = lt.get_element(filtrados, i)
-            lt.add_last(filtrados, ({
+            ultimos.append({
                 "pickup_datetime": t["pickup_datetime"],
                 "pickup_coords": [t["pickup_latitude"], t["pickup_longitude"]],
                 "dropoff_datetime": t["dropoff_datetime"],
                 "dropoff_coords": [t["dropoff_latitude"], t["dropoff_longitude"]],
                 "trip_distance": round(t["trip_distance"], 3),
                 "total_amount": round(t["total_amount"], 2)
-            }))
+            })
 
     end = get_time()
     tiempo_ms = round(delta_time(start, end), 3)
