@@ -333,7 +333,7 @@ def req_2(catalog, lat_min, lat_max, N):
 
     # Aca lo que hacemos es que filtramos los viajes por lo que dice el requerimiento
     filtrados = lt.new_list()
-    size_trips = lt.size(total_trips)
+    size_trips = lt.size(catalog["trips"])
 
     for i in range(size_trips):
         trip = get_data(catalog, i)
@@ -353,13 +353,13 @@ def req_2(catalog, lat_min, lat_max, N):
     # Aca ordenamos usando merge sort
     size_filtrados = lt.size(filtrados)
     if size_filtrados > 1:
-        filtrados = merge_sort(filtrados, sort_criteria_req2)
+        filtrados = lt.merge_sort(filtrados, sort_criteria_req2)
 
     # Creamos las listas para los primeros y ultimos
     primeros = lt.new_list()
     ultimos = lt.new_list()
 
-    if total_filtrados <= 2 * N:
+    if size_filtrados <= 2 * N:
         # Se devuelve solamente una vez los elementos y se igualan
         for i in range(size_filtrados):
             t = lt.get_element(filtrados, i)
@@ -387,7 +387,7 @@ def req_2(catalog, lat_min, lat_max, N):
             }))
 
         # Aca agregamos los ultimos elementos en el rango de N
-        for i in range(total_filtrados - N, total_filtrados):
+        for i in range(size_filtrados - N, size_filtrados):
             t = lt.get_element(filtrados, i)
             lt.add_last(filtrados, ({
                 "pickup_datetime": t["pickup_datetime"],
@@ -403,7 +403,7 @@ def req_2(catalog, lat_min, lat_max, N):
 
     return {
         "tiempo_ms": tiempo_ms,
-        "total_filtrados": total_filtrados,
+        "total_filtrados": size_filtrados,
         "primeros": primeros,
         "ultimos": ultimos
     }
