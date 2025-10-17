@@ -319,14 +319,14 @@ def req_2(catalog, lat_min, lat_max, N):
         filtrados = lt.merge_sort(filtrados, sort_criteria_req2)
 
     # Creamos las listas para los primeros y ultimos
-    primeros = lt.new_list()
-    ultimos = lt.new_list()
+    primeros = []
+    ultimos = []
 
     if size_filtrados <= 2 * N:
         # Se devuelve solamente una vez los elementos y se igualan
         for i in range(size_filtrados):
             t = lt.get_element(filtrados, i)
-            lt.add_last(t, primeros({
+            primeros.append(primeros({
                 "pickup_datetime": t["pickup_datetime"],
                 "pickup_coords": [t["pickup_latitude"], t["pickup_longitude"]],
                 "dropoff_datetime": t["dropoff_datetime"],
@@ -340,7 +340,7 @@ def req_2(catalog, lat_min, lat_max, N):
         # Aca agregamos los primeros elementos el rango de N
         for i in range(N):
             t = lt.get_element(filtrados, i)
-            lt.add_last(filtrados, ({
+            ultimos.append(({
                 "pickup_datetime": t["pickup_datetime"],
                 "pickup_coords": [t["pickup_latitude"], t["pickup_longitude"]],
                 "dropoff_datetime": t["dropoff_datetime"],
@@ -661,18 +661,18 @@ def req_6(catalog, barrio_buscar, hora_inicio_str, hora_fin_str, n_muestra):
 
     # Parsear N
     def parse_n(s, default):
-        if s.isdigit():
-            if s > 0:
-                return s
-            else:
-                return default
-        ss = str(s).strip()
-        if ss.isdigit():
-            v = int(ss)
-            if v > 0:
-                return v
-            else:
-                return default
+        # Caso: s ya es un número entero positivo
+        if type(s) in (int, float) and s == int(s) and s > 0:
+            return int(s)
+
+        # Caso: s es string que representa un entero positivo
+        if type(s) == str:
+            ss = s.strip()
+            if ss.isdigit():  # solo acepta dígitos, sin signos ni decimales
+                v = int(ss)
+                if v > 0:
+                    return v
+
         return default
 
     N = parse_n(n_muestra, 5)
@@ -681,23 +681,24 @@ def req_6(catalog, barrio_buscar, hora_inicio_str, hora_fin_str, n_muestra):
     barrios_list = catalog["barrios"]
     size_barrios = lt.size(barrios_list)
     idx_barrios = mp.new_map(max(1, size_barrios), 0.5)
-    for i in size_barrios:
+    for i in range(size_barrios):
         b = lt.get_element(barrios_list, i)
         nb_key = b["neighborhood"].strip().lower()
         if mp.get(idx_barrios, nb_key) is None:
             mp.put(idx_barrios, nb_key, lt.new_list())
 
     # Asignar cada viaje al barrio más cercano
-    for i in lt.size(catalog["trips"]):
+    for i in range(lt.size(catalog["trips"])):
         t = get_data(catalog, i)
         plat = t.get("pickup_latitude")
         plon = t.get("pickup_longitude")
         if plat is not None and plon is not None:
             mejor_nb = None
             mejor_dist = None
-            for b in barrios_list:
-                lat_b = b.get("latitude")
-                lon_b = b.get("longitude")
+            for j in range(lt.size(barrios_list)):
+                b = lt.get_element(barrios_list, j)
+                lat_b = b["latitude"]
+                lon_b = b["longitude"]
                 if lat_b is not None or lon_b is not None:
                     d = haversine(plat, plon, lat_b, lon_b)
                     if mejor_dist is None or d < mejor_dist:
@@ -716,8 +717,8 @@ def req_6(catalog, barrio_buscar, hora_inicio_str, hora_fin_str, n_muestra):
         tiempo_ms = round(delta_time(inicio_ms, get_time()), 3)
         return {"tiempo_ms": tiempo_ms, 
         "total": 0, 
-        "primeros": lt.new_list(), 
-        "ultimos": lt.new_list()
+        "primeros": [], 
+        "ultimos": []
         }
 
     # Filtrar por hora
@@ -753,15 +754,15 @@ def req_6(catalog, barrio_buscar, hora_inicio_str, hora_fin_str, n_muestra):
         candidatos = lt.merge_sort(candidatos, sort_criteria_req6)
 
     # Preparar salida
-    primeros = lt.new_list()
-    ultimos = lt.new_list()
+    primeros = []
+    ultimos = []
 
     def fila(t):
         return {
             "pickup_datetime": t["pickup_datetime"],
-            "pickup_coord": [round(t["pickup_latitude"], 6), round(t["pickup_longitude"], 6)],
+            "pickup_coords": [round(t["pickup_latitude"], 6), round(t["pickup_longitude"], 6)],
             "dropoff_datetime": t["dropoff_datetime"],
-            "dropoff_coord": [round(t["dropoff_latitude"], 6), round(t["dropoff_longitude"], 6)],
+            "dropoff_coords": [round(t["dropoff_latitude"], 6), round(t["dropoff_longitude"], 6)],
             "trip_distance": round(t["trip_distance"], 3),
             "total_amount": round(t["total_amount"], 2)
         }
@@ -777,17 +778,17 @@ def req_6(catalog, barrio_buscar, hora_inicio_str, hora_fin_str, n_muestra):
     if total <= 2 * N:
         j = 0
         while j < total:
-            lt.add_last(primeros, fila(lt.get_element(candidatos, j)))
+            primeros.append(fila(lt.get_element(candidatos, j)))
             j += 1
         ultimos = primeros
     else:
         j = 0
         while j < N:
-            lt.add_last(primeros, fila(lt.get_element(candidatos, j)))
+            primeros.append(fila(lt.get_element(candidatos, j)))
             j += 1
         j = total - N
         while j < total:
-            lt.add_last(ultimos, fila(lt.get_element(candidatos, j)))
+            ultimos.append(fila(lt.get_element(candidatos, j)))
             j += 1
 
     tiempo_ms = round(delta_time(inicio_ms, get_time()), 3)

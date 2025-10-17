@@ -176,6 +176,8 @@ def print_req_2(control):
         if result["total_filtrados"] > 0 and len(first_tbl) == result["total_filtrados"]:
             print("\n(Se mostraron todos los trayectos en la primera tabla por ser menos de 2N)")
 
+    print()
+
 
 def print_req_3(control):
     """
