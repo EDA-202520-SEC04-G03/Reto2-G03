@@ -29,11 +29,53 @@ def load_data(control):
     """
     # Cargar viajes
     taxis_file = "taxis-large.csv"
-    logic.load_data(control, taxis_file)
+    catalog, max_trip, min_trip, primeras5_rows, ultimas5_rows, tiempo_milisegundos_trips, total_registros_trips = logic.load_data(control, taxis_file)
+    resumen_trips = [
+        ["Archivo", taxis_file],
+        ["Registros cargados", total_registros_trips],
+        ["Tiempo de carga (ms)", round(tiempo_milisegundos_trips, 3)]
+    ]
+
+    print("\n=== Resumen de carga de datos de viajes ===") 
+    print(tabulate(resumen_trips, headers=["Métrica", "Valor"], tablefmt="psql"))
+    
+    print("\n=== Trayecto de menor distancia ===")
+    print(tabulate([{
+        "pickup_datetime": min_trip["pickup_datetime"],
+        "trip_distance": round(min_trip["trip_distance"], 3),
+        "total_amount": round(min_trip["total_amount"], 2)
+    }], headers="keys", tablefmt="psql"))
+
+    print("\n=== Trayecto de mayor distancia ===")
+    print(tabulate([{
+        "pickup_datetime": max_trip["pickup_datetime"],
+        "trip_distance": round(max_trip["trip_distance"], 3),
+        "total_amount": round(max_trip["total_amount"], 2)
+    }], headers="keys", tablefmt="psql"))
+    
+    print("\n=== Primeros 5 trayectos ===")
+    print(tabulate(primeras5_rows, headers="keys", tablefmt="psql"))
+
+    print("\n=== Últimos 5 trayectos ===")
+    print(tabulate(ultimas5_rows, headers="keys", tablefmt="psql"))
 
     # Cargar barrios
     barrios_file = "nyc-neighborhoods.csv"
-    logic.load_neighborhoods(control, barrios_file)
+    catalog, tiempo_milisegundos, total_registros, cargados = logic.load_neighborhoods(control, barrios_file)
+    resumen = [
+        ["Archivo", barrios_file],
+        ["Registros cargados", total_registros],
+        ["Tiempo de carga (ms)", round(tiempo_milisegundos, 3)]
+    ]
+
+    print("\n=== Resumen de carga de datos de barrios ===")
+    print(tabulate(resumen, headers=["Métrica", "Valor"], tablefmt="psql"))
+
+    if catalog["barrios"]["size"] > 0:
+        print(f"\nBarrios cargados: {cargados}")
+        print(tabulate(catalog["barrios"]["elements"][:5], headers="keys", tablefmt="psql"))
+    else:
+        print("\nNo se cargaron barrios. Revisa delimitador ';' y columnas: borough;neighborhood;latitude;longitude")
 
 
 

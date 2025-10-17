@@ -9,7 +9,7 @@ from DataStructures.Stack import stack as st
 from DataStructures.Queue import queue as q
 from DataStructures.Map import map_linear_probing as mp
 
-data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Data")
+data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Data", "Challenge-2")
 
 _FLOAT_RE = re.compile(r'^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$')
 def _parse_float_or_none(s: str):
@@ -90,57 +90,33 @@ def load_data(catalog, filename):
         if max_trip is None or dist > max_trip["trip_distance"]:
             max_trip = t
 
+    primeras5_rows = []
+    ultimas5_rows = []
+
     primeras_slice = elements[:5] if size > 0 else []
-    for t in primeras_slice:
-        primeras5_rows = [{
-            "pickup_datetime": t["pickup_datetime"],
-            "dropoff_datetime": t["dropoff_datetime"],
-            "duration_min": round(t["duration_min"], 2),
-            "trip_distance": round(t["trip_distance"], 3),
-            "total_amount": round(t["total_amount"], 2),
-        }]
+    
+    for trip in primeras_slice:
+        primeras5_rows.append( [{
+            "pickup_datetime": trip["pickup_datetime"],
+            "dropoff_datetime": trip["dropoff_datetime"],
+            "duration_min": round(trip["duration_min"], 2),
+            "trip_distance": round(trip["trip_distance"], 3),
+            "total_amount": round(trip["total_amount"], 2),
+        }])
+
     ultimas_slice = elements[-5:] 
     for t in ultimas_slice:
-        ultimas5_rows = [{
+        ultimas5_rows.append([{
             "pickup_datetime": t["pickup_datetime"],
             "dropoff_datetime": t["dropoff_datetime"],
             "duration_min": round(t["duration_min"], 2),
             "trip_distance": round(t["trip_distance"], 3),
             "total_amount": round(t["total_amount"], 2),
-        }]
+        }])
 
     total_registros = lt.size(catalog["trips"])
-    resumen = [
-        ["Archivo", filename],
-        ["Registros cargados", total_registros],
-        ["Tiempo de carga (ms)", round(tiempo_milisegundos, 3)]
-    ]
 
-    print("\n=== Resumen de carga de datos de viajes ===") 
-    print(tabulate.tabulate(resumen, headers=["Métrica", "Valor"], tablefmt="psql"))
-    
-    print("\n=== Trayecto de menor distancia ===")
-    print(tabulate.tabulate([{
-        "pickup_datetime": min_trip["pickup_datetime"],
-        "trip_distance": round(min_trip["trip_distance"], 3),
-        "total_amount": round(min_trip["total_amount"], 2)
-    }], headers="keys", tablefmt="psql"))
-
-    print("\n=== Trayecto de mayor distancia ===")
-    print(tabulate.tabulate([{
-        "pickup_datetime": max_trip["pickup_datetime"],
-        "trip_distance": round(max_trip["trip_distance"], 3),
-        "total_amount": round(max_trip["total_amount"], 2)
-    }], headers="keys", tablefmt="psql"))
-    
-    print("\n=== Primeros 5 trayectos ===")
-    print(tabulate.tabulate(primeras5_rows, headers="keys", tablefmt="psql"))
-
-    print("\n=== Últimos 5 trayectos ===")
-    print(tabulate.tabulate(ultimas5_rows, headers="keys", tablefmt="psql"))
-
-
-    return catalog
+    return catalog, max_trip, min_trip, primeras5_rows, ultimas5_rows, tiempo_milisegundos, total_registros
 
 def load_neighborhoods(catalog, filename):
     """
@@ -178,21 +154,8 @@ def load_neighborhoods(catalog, filename):
     end = get_time()
     tiempo_milisegundos = delta_time(start, end)
     total_registros = lt.size(catalog["barrios"])
-    resumen = [
-        ["Archivo", filename],
-        ["Registros cargados", total_registros],
-        ["Tiempo de carga (ms)", round(tiempo_milisegundos, 3)]
-    ]
-
-    print("\n=== Resumen de carga de datos de barrios ===")
-    print(tabulate.tabulate(resumen, headers=["Métrica", "Valor"], tablefmt="psql"))
-
-    if catalog["barrios"]["size"] > 0:
-        print(f"\nBarrios cargados: {cargados}")
-        print(tabulate.tabulate(catalog["barrios"]["elements"][:5], headers="keys", tablefmt="psql"))
-    else:
-        print("\nNo se cargaron barrios. Revisa delimitador ';' y columnas: borough;neighborhood;latitude;longitude")
-    return catalog
+    
+    return catalog, tiempo_milisegundos, total_registros, cargados
 
 
 def clave_hora_terminacion(trip):
